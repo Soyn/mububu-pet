@@ -1,0 +1,11 @@
+{
+  "name": "muse-pet",
+  "displayName": "Muse Pet",
+  "version": "0.2.0",
+  "description": "A pixel Muse above your prompt: it waves and chimes when Claude is waiting for you, hops when a long turn is done, carries the context meter and cost, and can be your own Muse from gadget.mububu.app",
+  "author": { "name": "Mububu", "url": "https://mububu.app" },
+  "homepage": "https://gadget.mububu.app/launch/#pet",
+  "repository": "https://github.com/Soyn/mububu-pet",
+  "license": "MIT",
+  "keywords": ["pet", "pixel-art", "muse", "status", "fun"]
+}

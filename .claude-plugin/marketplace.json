@@ -1,0 +1,15 @@
+{
+  "name": "mububu",
+  "description": "Mububu's Claude Code mods: the pixel Muse pet",
+  "owner": {
+    "name": "Mububu",
+    "url": "https://mububu.app"
+  },
+  "plugins": [
+    {
+      "name": "muse-pet",
+      "source": "./",
+      "description": "A pixel Muse above your prompt, from gadget.mububu.app"
+    }
+  ]
+}
