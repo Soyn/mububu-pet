@@ -1,5 +1,7 @@
 # muse-pet
 
+Install guide, what it does, and how to make it your Muse: https://gadget.mububu.app/launch/pet/
+
 A Claude Code mod (v2.1.287+): a pixel Muse that lives above the prompt and earns its place.
 
 - **It watches Claude for you.** When Claude stops to ask (a permission prompt, a question) the Muse waves,
