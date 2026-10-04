@@ -1,4 +1,7 @@
 {
   "description": "The muse-pet hooks module",
-  "modules": ["./register.ts"]
+  "modules": [
+    "./register.ts"
+  ],
+  "hooks": {}
 }

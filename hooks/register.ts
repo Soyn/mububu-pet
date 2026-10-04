@@ -77,6 +77,12 @@ export const register: Register = (on) => {
     await $.command.register({ name: 'muse', description: 'Make the pet your own Muse: /muse <id or link from gadget.mububu.app>, /muse default' })
     const saved = await $.store.get('size'); if (saved === 'small' || saved === 'big') size = saved
     custom = asSheet(await $.store.get('sheet'))
+    // the first time: say what it is and what to do next (once per machine)
+    if (!(await $.store.get('welcomed'))) {
+      await $.store.set('welcomed', true)
+      $.ui.toast('Muse Pet is here, above the prompt. /pet pets it; /muse <id> makes it your own Muse.', { timeoutMs: 9000 })
+      $.ui.log('muse-pet: the Muse lives above your prompt. It waves when Claude waits for you and chimes when a long turn is done. /pet to pet it, /pet small to shrink it, /muse <id> for your own Muse (gadget.mububu.app → Share → Terminal Pet).')
+    }
     // the frame clock (the terminal caps the band's redraws, so about 10 a second)
     $.clock.every(100, () => {
       tick += 1; since += 1; quiet += 1
