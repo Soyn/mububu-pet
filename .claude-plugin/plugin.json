@@ -1,7 +1,7 @@
 {
   "name": "muse-pet",
   "displayName": "Muse Pet",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "A pixel Muse above your prompt: it waves and chimes when Claude is waiting for you, hops when a long turn is done, carries the context meter and cost, and can be your own Muse from gadget.mububu.app",
   "author": {
     "name": "Mububu",

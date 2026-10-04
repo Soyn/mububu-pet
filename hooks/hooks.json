@@ -1,7 +1,19 @@
 {
-  "description": "The muse-pet hooks module",
+  "description": "The muse-pet hooks module, and a version check for Claude Code builds too old to run it",
   "modules": [
     "./register.ts"
   ],
-  "hooks": {}
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh \"${CLAUDE_PLUGIN_ROOT}/hooks/check-version.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
 }
