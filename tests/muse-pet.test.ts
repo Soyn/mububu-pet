@@ -53,3 +53,24 @@ test('it waits, resizes and takes a muse of its own', async ($, on) => {
   const back = await $.command.run({ command: 'muse', args: 'default' })
   expect(back.text).toBe('back to the mububu muse')
 })
+
+// /pet mute silences the chimes and is remembered; /pet sound brings them back
+test('/pet mute silences the chimes, /pet sound restores them', async ($, on) => {
+  const played: string[] = []
+  on('audio.play', (_, e) => { played.push(JSON.stringify(e)); return { value: undefined } })
+  const store: Record<string, unknown> = {}
+  on('store.set', (_, e) => { const { key, value } = e as { key: string; value: unknown }; store[key] = value; return { value: undefined } })
+  on('store.get', (_, e) => ({ value: store[(e as { key: string }).key] }))
+  const muted = await $.command.run({ command: 'pet', args: 'mute' })
+  expect(muted.text).toMatch(/muted/)
+  expect(store.muted).toBe(true)
+  await $.command.run({ command: 'pet', args: '' })
+  expect(played.length).toBe(0)
+  const band = await $.ui.mount({ plugin: 'muse-pet', surface: 'desktop', component: 'AbovePrompt', props: { hasSurvey: false, isWorking: false, maxRows: 10, bodyColumns: 80 } })
+  expect(await band.find({ text: /muted/ })).toBeDefined()
+  await band.unmount()
+  const back = await $.command.run({ command: 'pet', args: 'sound' })
+  expect(back.text).toBe('the muse has its voice back')
+  expect(store.muted).toBe(false)
+  expect(played.some((p) => p.includes('purr.wav'))).toBe(true)
+})

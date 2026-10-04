@@ -5,7 +5,8 @@
 // It is useful, not only cute: it waves and chimes when Claude is waiting for you (a permission or a
 // question), chimes when a long turn is done, and carries the context meter and the session's cost;
 // as the context fills it gets sleepy and asks for /compact. /pet pets it. /muse <id> makes it your
-// own Muse, from the Gadget's "terminal pet" (gadget.mububu.app). /pet small|big sets its size.
+// own Muse, from the Gadget's "terminal pet" (gadget.mububu.app). /pet small|big sets its size,
+// /pet mute silences every chime (remembered), /pet sound brings them back.
 import type { Register } from 'claude-code'
 import { SHEETS } from './sprites'
 
@@ -60,6 +61,9 @@ function asSheet(x: unknown): Sheet | null {
   for (const fr of Object.values(s.clips)) if (!Array.isArray(fr) || !fr.length || !fr.every((f) => Array.isArray(f) && f.length === s.h && f.every((r) => typeof r === 'string' && r.length === s.w))) return null
   return { w: s.w, h: s.h, palette: s.palette, clips: s.clips, name: typeof s.name === 'string' ? s.name.slice(0, 40) : undefined }
 }
+// every sound goes through here, so /pet mute silences all of them at once
+type Speaker = { audio: { play: (o: { asset: string }) => Promise<unknown> } }
+const play = (host: Speaker, asset: string, muted: boolean) => { if (!muted) host.audio.play({ asset }).catch(() => {}) }
 const meter = (pct: number) => { const n = Math.round(pct / 20); return '▮'.repeat(n) + '▯'.repeat(5 - n) }
 
 export const register: Register = (on) => {
@@ -69,14 +73,16 @@ export const register: Register = (on) => {
   let size: 'big' | 'small' = 'big'
   let custom: Sheet | null = null
   let ctx = 0, usd = 0
+  let muted = false
   const sheet = (): Sheet => custom ?? (SHEETS[size] as unknown as Sheet)
   const set = (m: Mood, text?: string) => { mood = m; since = 0; quiet = 0; if (text !== undefined) line = text }
 
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'pet', description: 'Pet the Muse; /pet small or /pet big sets its size' })
+    await $.command.register({ name: 'pet', description: 'Pet the Muse; /pet small|big sets its size, /pet mute and /pet sound toggle its chimes' })
     await $.command.register({ name: 'muse', description: 'Make the pet your own Muse: /muse <id or link from gadget.mububu.app>, /muse default' })
     const saved = await $.store.get('size'); if (saved === 'small' || saved === 'big') size = saved
     custom = asSheet(await $.store.get('sheet'))
+    muted = (await $.store.get('muted')) === true
     // the first time: say what it is and what to do next (once per machine)
     if (!(await $.store.get('welcomed'))) {
       await $.store.set('welcomed', true)
@@ -110,7 +116,7 @@ export const register: Register = (on) => {
   on('turn.start', async ($, e, next) => { tools = 0; waited = false; phraseTick = tick; set('thinking', pick(MUSINGS)); return next(e) })
   on('tool.call', async ($, e, next) => {
     tools += 1
-    if (e.tool === 'AskUserQuestion') { waited = true; set('waiting', 'a question for you'); $.audio.play({ asset: 'sounds/waiting.wav' }).catch(() => {}) }
+    if (e.tool === 'AskUserQuestion') { waited = true; set('waiting', 'a question for you'); play($, 'sounds/waiting.wav', muted) }
     else set('tool', `peeking at ${e.tool}`)
     const result = await next(e)
     if (mood === 'waiting') set('thinking', pick(MUSINGS))
@@ -119,21 +125,24 @@ export const register: Register = (on) => {
   // a permission prompt: the decision the rules reached is "ask", so Claude is now waiting for you
   on('tool.check', async ($, e, next) => {
     const decided = await next(e)
-    if (decided?.decision === 'ask' && mood !== 'waiting') { waited = true; set('waiting', `waiting for you · ${e.tool}`); $.audio.play({ asset: 'sounds/waiting.wav' }).catch(() => {}) }
+    if (decided?.decision === 'ask' && mood !== 'waiting') { waited = true; set('waiting', `waiting for you · ${e.tool}`); play($, 'sounds/waiting.wav', muted) }
     return decided
   })
   on('turn.complete', async ($, e, next) => {
     const secs = Math.round((e.durationMs ?? 0) / 1000)
     set('done', e.isAborted ? 'oh. okay.' : `${pick(DONE)} · ${secs}s, ${tools} tool${tools === 1 ? '' : 's'}`)
-    if (!e.isAborted && (secs >= 15 || waited)) $.audio.play({ asset: 'sounds/done.wav' }).catch(() => {})
+    if (!e.isAborted && (secs >= 15 || waited)) play($, 'sounds/done.wav', muted)
     return next(e)
   })
 
   on('command.run', { command: 'pet' }, async ($, e) => {
     const arg = (e.args ?? '').trim().toLowerCase()
     if (arg === 'small' || arg === 'big') { size = arg; await $.store.set('size', size); return { text: `the muse is now ${size}` } }
+    if (arg === 'mute' || arg === 'quiet' || arg === 'silent') { muted = true; await $.store.set('muted', true); return { text: 'the muse is muted. it still waves when Claude waits for you; /pet sound brings the chimes back.' } }
+    if (arg === 'sound' || arg === 'unmute' || arg === 'loud') { muted = false; await $.store.set('muted', false); play($, 'sounds/purr.wav', muted); return { text: 'the muse has its voice back' } }
+    if (arg) return { text: '/pet · /pet small · /pet big · /pet mute · /pet sound' }
     set('petted', pick(PURRS))
-    $.audio.play({ asset: 'sounds/purr.wav' }).catch(() => {})
+    play($, 'sounds/purr.wav', muted)
     return {}
   })
   on('command.run', { command: 'muse' }, async ($, e) => {
@@ -157,7 +166,7 @@ export const register: Register = (on) => {
     if (e.props.hasSurvey) return next(e)
     const { Box, Text } = $.ui.resolve(e)
     const dots = mood === 'thinking' ? '.'.repeat(1 + (Math.floor(tick / 4) % 3)) : ''
-    const stats = `${meter(ctx)} ${ctx}%` + (usd ? ` · $${usd.toFixed(2)}` : '')
+    const stats = `${meter(ctx)} ${ctx}%` + (usd ? ` · $${usd.toFixed(2)}` : '') + (muted ? ' · muted' : '')
     const words = Box({ flexDirection: 'column', children: [
       Text({ bold: true, children: [custom?.name || 'muse'] }),
       Text({ dimColor: mood === 'idle' || mood === 'sleepy', bold: mood === 'waiting', children: [line + dots] }),
