@@ -6,7 +6,8 @@
 // question), chimes when a long turn is done, and carries the context meter and the session's cost;
 // as the context fills it gets sleepy and asks for /compact. /pet pets it. /muse <id> makes it your
 // own Muse, from the Gadget's "terminal pet" (gadget.mububu.app). /pet small|big sets its size,
-// /pet mute silences every chime (remembered), /pet sound brings them back.
+// /pet mute silences every chime (remembered), /pet sound brings them back. The controls under the
+// Muse (hide, mute) do the same with a click; hidden, it is one dim line with a show control.
 import type { Register } from 'claude-code'
 import { SHEETS } from './sprites'
 
@@ -74,11 +75,12 @@ export const register: Register = (on) => {
   let custom: Sheet | null = null
   let ctx = 0, usd = 0
   let muted = false
+  let compact = false // one line, no picture (this session; the controls or /pet hide toggle it)
   const sheet = (): Sheet => custom ?? (SHEETS[size] as unknown as Sheet)
   const set = (m: Mood, text?: string) => { mood = m; since = 0; quiet = 0; if (text !== undefined) line = text }
 
   on('session.start', async ($, e, next) => {
-    await $.command.register({ name: 'pet', description: 'Pet the Muse; /pet small|big sets its size, /pet mute and /pet sound toggle its chimes' })
+    await $.command.register({ name: 'pet', description: 'Pet the Muse; /pet small|big sets its size, /pet mute|sound its chimes, /pet hide|show its picture' })
     await $.command.register({ name: 'muse', description: 'Make the pet your own Muse: /muse <id or link from gadget.mububu.app>, /muse default' })
     const saved = await $.store.get('size'); if (saved === 'small' || saved === 'big') size = saved
     custom = asSheet(await $.store.get('sheet'))
@@ -140,7 +142,9 @@ export const register: Register = (on) => {
     if (arg === 'small' || arg === 'big') { size = arg; await $.store.set('size', size); return { text: `the muse is now ${size}` } }
     if (arg === 'mute' || arg === 'quiet' || arg === 'silent') { muted = true; await $.store.set('muted', true); return { text: 'the muse is muted. it still waves when Claude waits for you; /pet sound brings the chimes back.' } }
     if (arg === 'sound' || arg === 'unmute' || arg === 'loud') { muted = false; await $.store.set('muted', false); play($, 'sounds/purr.wav', muted); return { text: 'the muse has its voice back' } }
-    if (arg) return { text: '/pet · /pet small · /pet big · /pet mute · /pet sound' }
+    if (arg === 'hide') { compact = true; return { text: 'the muse is one line now. /pet show, or its show control, brings the picture back.' } }
+    if (arg === 'show') { compact = false; return { text: 'the muse is back' } }
+    if (arg) return { text: '/pet · /pet small · /pet big · /pet mute · /pet sound · /pet hide · /pet show' }
     set('petted', pick(PURRS))
     play($, 'sounds/purr.wav', muted)
     return {}
@@ -164,13 +168,27 @@ export const register: Register = (on) => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
-    const { Box, Text } = $.ui.resolve(e)
+    const { Box, Text, Button } = $.ui.resolve(e)
     const dots = mood === 'thinking' ? '.'.repeat(1 + (Math.floor(tick / 4) % 3)) : ''
-    const stats = `${meter(ctx)} ${ctx}%` + (usd ? ` · $${usd.toFixed(2)}` : '') + (muted ? ' · muted' : '')
+    const stats = `${meter(ctx)} ${ctx}%` + (usd ? ` · ${usd.toFixed(2)}` : '') + (muted ? ' · muted' : '')
+    // the controls: a click on either, no chord needed (the engine's own [-] sits far right)
+    const soundCtl = Button({ key: 'mute', label: muted ? 'sound' : 'mute', plain: true, dimColor: true, onPress: () => { muted = !muted; $.store.set('muted', muted).catch(() => {}); $.ui.invalidate('ui.render') } })
+    if (compact) return Box({ flexDirection: 'row', columnGap: 1, children: [
+      Text({ dimColor: mood !== 'waiting', bold: mood === 'waiting', children: [`▸ ${custom?.name || 'muse'} · ${line}${dots} · ${stats}`] }),
+      Button({ key: 'show', label: 'show', plain: true, dimColor: true, onPress: () => { compact = false; $.ui.invalidate('ui.render') } }),
+      Text({ dimColor: true, children: ['·'] }),
+      soundCtl,
+    ] })
+    const controls = Box({ flexDirection: 'row', columnGap: 1, children: [
+      Button({ key: 'hide', label: 'hide', plain: true, dimColor: true, onPress: () => { compact = true; $.ui.invalidate('ui.render') } }),
+      Text({ dimColor: true, children: ['·'] }),
+      soundCtl,
+    ] })
     const words = Box({ flexDirection: 'column', children: [
       Text({ bold: true, children: [custom?.name || 'muse'] }),
       Text({ dimColor: mood === 'idle' || mood === 'sleepy', bold: mood === 'waiting', children: [line + dots] }),
       Text({ dimColor: true, children: [stats] }),
+      controls,
     ] })
     if (e.surface !== 'terminal') {
       const face = mood === 'thinking' ? '( ˘ ᵕ ˘ )' : mood === 'done' || mood === 'petted' ? '( ^ ᵕ ^ )' : mood === 'sleepy' ? '( - ᵕ - )' : mood === 'waiting' ? '( • ᵕ • )/' : '( • ᵕ • )'

@@ -12,6 +12,8 @@ A Claude Code mod (v2.1.287+): a pixel Muse that lives above the prompt and earn
   renders your Muse's pose clips (about ten seconds) and gives you the command. `/muse default` goes back.
 - `/pet` pets it (a purr, two hearts). `/pet small` / `/pet big` set its size (24 or 32 pixels; the default is big).
 - `/pet mute` silences every chime (for heads-down coding; it still waves). `/pet sound` brings them back. Remembered.
+- Under the Muse sit two click controls, `hide` and `mute`: no chord needed. Hidden, it is one dim line with a
+  `show` control, still saying what Claude waits on. `/pet hide` / `/pet show` do the same (this session only).
 
 The frames are the real 3D Muse through the Gadget's pixelator, head and shoulders, one clip per pose
 (idle, think, wave, cheer, jump, sit, walk), drawn as half-block cells (two pixel rows per terminal row)
